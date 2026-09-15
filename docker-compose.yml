@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16
+    container_name: mensalhub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mensalhub
+      POSTGRES_PASSWORD: mensalhub
+      POSTGRES_DB: mensalhub
+    ports:
+      # host 5435 → evita conflito com Postgres local (5432) e outros containers (5433/5434)
+      - "5435:5432"
+    volumes:
+      - mensalhub-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mensalhub -d mensalhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mensalhub-db-data:

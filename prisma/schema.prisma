@@ -1,0 +1,243 @@
+// MensalHub — schema do banco.
+// Traduz o Modelo de Dados do vault. Fonte da verdade do banco.
+// Regra de ouro: TODA entidade do domínio pertence a uma Organização (tenant).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: a URL de conexão fica em prisma.config.ts (não mais aqui).
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum TipoPessoa {
+  PF // professor particular / autônomo (CPF)
+  PJ // escola / empresa (CNPJ)
+}
+
+enum UserRole {
+  DONO // dono da organização; único papel no MVP
+}
+
+enum MatriculaStatus {
+  ATIVA
+  TRANCADA
+  ENCERRADA
+}
+
+enum MensalidadeStatus {
+  ABERTA
+  PAGA
+  ATRASADA
+  CANCELADA
+}
+
+enum MetodoPagamento {
+  DINHEIRO
+  PIX
+  CARTAO
+  BOLETO
+  TRANSFERENCIA
+  OUTRO
+}
+
+enum NotaFiscalStatus {
+  PENDENTE
+  EMITIDA
+  CANCELADA
+  ERRO
+}
+
+// ─────────────────────────── Tenant / Organização ───────────────────────────
+
+model Organizacao {
+  id         String     @id @default(uuid())
+  nome       String
+  tipoPessoa TipoPessoa @map("tipo_pessoa")
+  documento  String? // CPF (PF) ou CNPJ (PJ); obrigatório só p/ NFS-e
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  usuarios     Usuario[]
+  responsaveis Responsavel[]
+  alunos       Aluno[]
+  cursos       Curso[]
+  matriculas   Matricula[]
+  mensalidades Mensalidade[]
+  pagamentos   Pagamento[]
+  notasFiscais NotaFiscal[]
+
+  @@map("organizacoes")
+}
+
+// ─────────────────────────── Usuário (login) ───────────────────────────
+
+model Usuario {
+  id            String   @id @default(uuid())
+  organizacaoId String   @map("organizacao_id")
+  nome          String
+  email         String   @unique
+  senhaHash     String   @map("senha_hash")
+  role          UserRole @default(DONO)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+
+  @@index([organizacaoId])
+  @@map("usuarios")
+}
+
+// ─────────────────────────── Responsável ───────────────────────────
+
+model Responsavel {
+  id            String   @id @default(uuid())
+  organizacaoId String   @map("organizacao_id")
+  nome          String
+  cpf           String?
+  email         String?
+  telefone      String?
+  endereco      String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  alunos      Aluno[]
+
+  @@index([organizacaoId])
+  @@map("responsaveis")
+}
+
+// ─────────────────────────── Aluno ───────────────────────────
+
+model Aluno {
+  id            String    @id @default(uuid())
+  organizacaoId String    @map("organizacao_id")
+  responsavelId String?   @map("responsavel_id")
+  nome          String
+  nascimento    DateTime? @db.Date
+  telefone      String?
+  email         String?
+  observacoes   String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  organizacao Organizacao  @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  responsavel Responsavel? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  matriculas  Matricula[]
+
+  @@index([organizacaoId])
+  @@index([responsavelId])
+  @@map("alunos")
+}
+
+// ─────────────────────────── Curso ───────────────────────────
+
+model Curso {
+  id               String   @id @default(uuid())
+  organizacaoId    String   @map("organizacao_id")
+  nome             String
+  valorMensalidade Decimal  @map("valor_mensalidade") @db.Decimal(10, 2)
+  ativo            Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  matriculas  Matricula[]
+
+  @@index([organizacaoId])
+  @@map("cursos")
+}
+
+// ─────────────────────────── Matrícula ───────────────────────────
+
+model Matricula {
+  id            String          @id @default(uuid())
+  organizacaoId String          @map("organizacao_id")
+  alunoId       String          @map("aluno_id")
+  cursoId       String          @map("curso_id")
+  inicio        DateTime        @db.Date
+  fim           DateTime?       @db.Date
+  diaVencimento Int             @default(10) @map("dia_vencimento") // dia do mês (1-28)
+  valor         Decimal?        @db.Decimal(10, 2) // override do valor do curso, se houver
+  status        MatriculaStatus @default(ATIVA)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  organizacao  Organizacao   @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  aluno        Aluno         @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  curso        Curso         @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  mensalidades Mensalidade[]
+
+  @@index([organizacaoId])
+  @@index([alunoId])
+  @@index([cursoId])
+  @@map("matriculas")
+}
+
+// ─────────────────────────── Mensalidade ───────────────────────────
+
+model Mensalidade {
+  id            String            @id @default(uuid())
+  organizacaoId String            @map("organizacao_id")
+  matriculaId   String            @map("matricula_id")
+  competencia   DateTime          @db.Date // mês de referência (1º dia do mês)
+  vencimento    DateTime          @db.Date
+  valor         Decimal           @db.Decimal(10, 2)
+  status        MensalidadeStatus @default(ABERTA)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  organizacao Organizacao  @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  matricula   Matricula    @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+  pagamentos  Pagamento[]
+  notaFiscal  NotaFiscal?
+
+  // uma matrícula tem no máximo uma mensalidade por competência
+  @@unique([matriculaId, competencia])
+  @@index([organizacaoId])
+  @@index([organizacaoId, status])
+  @@index([organizacaoId, vencimento])
+  @@map("mensalidades")
+}
+
+// ─────────────────────────── Pagamento ───────────────────────────
+
+model Pagamento {
+  id            String          @id @default(uuid())
+  organizacaoId String          @map("organizacao_id")
+  mensalidadeId String          @map("mensalidade_id")
+  data          DateTime        @default(now())
+  valor         Decimal         @db.Decimal(10, 2)
+  metodo        MetodoPagamento @default(PIX)
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  mensalidade Mensalidade @relation(fields: [mensalidadeId], references: [id], onDelete: Cascade)
+
+  @@index([organizacaoId])
+  @@index([mensalidadeId])
+  @@map("pagamentos")
+}
+
+// ─────────────────────────── Nota Fiscal (NFS-e) ───────────────────────────
+
+model NotaFiscal {
+  id            String           @id @default(uuid())
+  organizacaoId String           @map("organizacao_id")
+  mensalidadeId String           @unique @map("mensalidade_id")
+  numero        String?
+  status        NotaFiscalStatus @default(PENDENTE)
+  emissao       DateTime?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  mensalidade Mensalidade @relation(fields: [mensalidadeId], references: [id], onDelete: Cascade)
+
+  @@index([organizacaoId])
+  @@map("notas_fiscais")
+}
