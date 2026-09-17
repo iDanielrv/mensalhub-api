@@ -8,6 +8,11 @@ import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { validateEnv } from './config/env.validation.js';
 import { AlunoModule } from './modules/aluno/aluno.module.js';
+import { CursoModule } from './modules/curso/curso.module.js';
+import { MatriculaModule } from './modules/matricula/matricula.module.js';
+import { MensalidadeModule } from './modules/mensalidade/mensalidade.module.js';
+import { PagamentoModule } from './modules/pagamento/pagamento.module.js';
+import { ResponsavelModule } from './modules/responsavel/responsavel.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -29,6 +34,11 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PrismaModule,
     AuthModule,
     AlunoModule,
+    CursoModule,
+    MatriculaModule,
+    MensalidadeModule,
+    PagamentoModule,
+    ResponsavelModule,
   ],
   controllers: [AppController],
   providers: [
