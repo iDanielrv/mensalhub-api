@@ -6,6 +6,7 @@ import {
 import { MatriculaRepository } from './matricula.repository.js';
 import type { CreateMatriculaDto } from './dto/create-matricula.dto.js';
 import type { UpdateMatriculaDto } from './dto/update-matricula.dto.js';
+import type { AtivarMatriculaDto } from './dto/ativar-matricula.dto.js';
 
 @Injectable()
 export class MatriculaService {
@@ -38,6 +39,49 @@ export class MatriculaService {
     const matricula = await this.matriculas.findOne(organizacaoId, id);
     if (!matricula) throw new NotFoundException('Matrícula não encontrada');
     return matricula;
+  }
+
+  // Ativa uma matrícula AGUARDANDO cobrando o 1º pagamento (mensalidade do mês
+  // de início, já paga). A matrícula só passa a gerar mensalidades depois disso.
+  async ativarComPagamento(
+    organizacaoId: string,
+    id: string,
+    dto: AtivarMatriculaDto,
+  ) {
+    const matricula = await this.findOne(organizacaoId, id);
+
+    if (matricula.status !== 'AGUARDANDO') {
+      throw new BadRequestException(
+        'Apenas matrículas aguardando pagamento podem ser ativadas por aqui',
+      );
+    }
+
+    const valor = dto.valor ?? (matricula.valor ? Number(matricula.valor) : null);
+    if (valor === null) {
+      throw new BadRequestException(
+        'Defina o valor da mensalidade antes de ativar a matrícula',
+      );
+    }
+
+    // Competência e vencimento derivam do mês de início da matrícula.
+    const inicio = new Date(matricula.inicio);
+    const ano = inicio.getUTCFullYear();
+    const mes = inicio.getUTCMonth(); // 0-based
+    const competencia = new Date(Date.UTC(ano, mes, 1));
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    const vencimento = new Date(
+      Date.UTC(ano, mes, Math.min(matricula.diaVencimento, ultimoDia)),
+    );
+
+    return this.matriculas.ativarComPrimeiroPagamento({
+      organizacaoId,
+      matriculaId: id,
+      competencia,
+      vencimento,
+      valor,
+      metodo: dto.metodo,
+      data: dto.data ? new Date(dto.data) : new Date(),
+    });
   }
 
   async update(organizacaoId: string, id: string, dto: UpdateMatriculaDto) {

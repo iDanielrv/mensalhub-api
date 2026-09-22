@@ -1,14 +1,44 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { MensalidadeRepository } from './mensalidade.repository.js';
 import type { GerarMensalidadesDto } from './dto/gerar-mensalidades.dto.js';
 import type { UpdateMensalidadeDto } from './dto/update-mensalidade.dto.js';
 
 @Injectable()
 export class MensalidadeService {
+  private readonly logger = new Logger(MensalidadeService.name);
+
   constructor(private readonly mensalidades: MensalidadeRepository) {}
 
   gerar(organizacaoId: string, dto: GerarMensalidadesDto) {
     return this.mensalidades.gerar(organizacaoId, dto.mes, dto.ano);
+  }
+
+  // Geração automática: todo dia 1º às 06:00 gera as mensalidades do mês corrente
+  // para todas as matrículas ATIVA (o dia de vencimento vem de cada matrícula).
+  // Idempotente (skipDuplicates), então rodar de novo não duplica. O botão manual
+  // na tela continua servindo de fallback e para meses passados.
+  @Cron('0 6 1 * *', { name: 'gerar-mensalidades-mensal' }) // 06:00 do dia 1º de cada mês
+  async gerarMensalidadesDoMes() {
+    const hoje = new Date();
+    const mes = hoje.getMonth() + 1;
+    const ano = hoje.getFullYear();
+
+    this.logger.log(`Geração automática ${mes}/${ano}: iniciando…`);
+    try {
+      const { geradas, total } = await this.mensalidades.gerarTodas(mes, ano);
+      this.logger.log(
+        `Geração automática ${mes}/${ano}: ${geradas} mensalidade(s) criada(s) de ${total} matrícula(s) ativa(s).`,
+      );
+    } catch (err) {
+      // Não re-lança: num cron o erro não teria quem tratar. Registra com stack
+      // para cair no log/telemetria (@nestjs/observe) e o banner "Gerar agora" na
+      // tela cobre o mês até alguém rodar manualmente.
+      this.logger.error(
+        `Geração automática ${mes}/${ano} FALHOU: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+    }
   }
 
   async findAll(organizacaoId: string, mes?: number, ano?: number) {
@@ -21,6 +51,10 @@ export class MensalidadeService {
     const mensalidade = await this.mensalidades.findOne(organizacaoId, id);
     if (!mensalidade) throw new NotFoundException('Mensalidade não encontrada');
     return mensalidade;
+  }
+
+  resumoFinanceiro(organizacaoId: string) {
+    return this.mensalidades.resumoFinanceiro(organizacaoId);
   }
 
   async inadimplencia(organizacaoId: string) {

@@ -12,6 +12,7 @@ import type { AuthUser } from '../../common/types/auth-user.js';
 import { MatriculaService } from './matricula.service.js';
 import { CreateMatriculaDto } from './dto/create-matricula.dto.js';
 import { UpdateMatriculaDto } from './dto/update-matricula.dto.js';
+import { AtivarMatriculaDto } from './dto/ativar-matricula.dto.js';
 
 // Matrícula não tem delete — encerra via PATCH { status: 'ENCERRADA' }.
 @Controller('matriculas')
@@ -34,6 +35,16 @@ export class MatriculaController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.matriculas.findOne(user.organizacaoId, id);
+  }
+
+  // Ativa a matrícula registrando o 1º pagamento (a entrada).
+  @Post(':id/ativar')
+  ativar(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AtivarMatriculaDto,
+  ) {
+    return this.matriculas.ativarComPagamento(user.organizacaoId, id, dto);
   }
 
   @Patch(':id')

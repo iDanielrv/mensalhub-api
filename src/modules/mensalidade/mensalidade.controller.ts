@@ -37,7 +37,12 @@ export class MensalidadeController {
     );
   }
 
-  // Rota estática declarada antes de ':id' para não ser capturada pelo ParseUUIDPipe.
+  // Rotas estáticas declaradas antes de ':id' para não serem capturadas pelo ParseUUIDPipe.
+  @Get('resumo')
+  resumoFinanceiro(@CurrentUser() user: AuthUser) {
+    return this.mensalidades.resumoFinanceiro(user.organizacaoId);
+  }
+
   @Get('inadimplencia')
   inadimplencia(@CurrentUser() user: AuthUser) {
     return this.mensalidades.inadimplencia(user.organizacaoId);

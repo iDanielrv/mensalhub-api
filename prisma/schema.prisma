@@ -23,6 +23,7 @@ enum UserRole {
 }
 
 enum MatriculaStatus {
+  AGUARDANDO
   ATIVA
   TRANCADA
   ENCERRADA
@@ -163,7 +164,7 @@ model Matricula {
   fim           DateTime?       @db.Date
   diaVencimento Int             @default(10) @map("dia_vencimento") // dia do mês (1-28)
   valor         Decimal?        @db.Decimal(10, 2) // override do valor do curso, se houver
-  status        MatriculaStatus @default(ATIVA)
+  status        MatriculaStatus @default(AGUARDANDO)
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
