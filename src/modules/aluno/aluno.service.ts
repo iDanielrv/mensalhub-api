@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AlunoRepository } from './aluno.repository.js';
+import { toAlunoResponse, type AlunoResponse } from './aluno.response.js';
 import type { CreateAlunoDto } from './dto/create-aluno.dto.js';
 import type { UpdateAlunoDto } from './dto/update-aluno.dto.js';
 
@@ -12,11 +13,11 @@ import type { UpdateAlunoDto } from './dto/update-aluno.dto.js';
 export class AlunoService {
   constructor(private readonly alunos: AlunoRepository) {}
 
-  async create(organizacaoId: string, dto: CreateAlunoDto) {
+  async create(organizacaoId: string, dto: CreateAlunoDto): Promise<AlunoResponse> {
     if (dto.responsavelId) {
       await this.assertResponsavel(organizacaoId, dto.responsavelId);
     }
-    return this.alunos.create({
+    const aluno = await this.alunos.create({
       organizacaoId,
       nome: dto.nome,
       nascimento: dto.nascimento ? new Date(dto.nascimento) : null,
@@ -25,27 +26,33 @@ export class AlunoService {
       email: dto.email ?? null,
       observacoes: dto.observacoes ?? null,
     });
+    return toAlunoResponse(aluno);
   }
 
-  findAll(organizacaoId: string) {
-    return this.alunos.findMany(organizacaoId);
+  async findAll(organizacaoId: string): Promise<AlunoResponse[]> {
+    const alunos = await this.alunos.findMany(organizacaoId);
+    return alunos.map(toAlunoResponse);
   }
 
-  async findOne(organizacaoId: string, id: string) {
+  async findOne(organizacaoId: string, id: string): Promise<AlunoResponse> {
     const aluno = await this.alunos.findOne(organizacaoId, id);
     if (!aluno) {
       throw new NotFoundException('Aluno não encontrado');
     }
-    return aluno;
+    return toAlunoResponse(aluno);
   }
 
-  async update(organizacaoId: string, id: string, dto: UpdateAlunoDto) {
+  async update(
+    organizacaoId: string,
+    id: string,
+    dto: UpdateAlunoDto,
+  ): Promise<AlunoResponse> {
     // Garante que o aluno existe E pertence à organização antes de atualizar.
     await this.findOne(organizacaoId, id);
     if (dto.responsavelId) {
       await this.assertResponsavel(organizacaoId, dto.responsavelId);
     }
-    return this.alunos.update(id, {
+    const aluno = await this.alunos.update(id, {
       nome: dto.nome,
       nascimento: dto.nascimento ? new Date(dto.nascimento) : undefined,
       responsavelId: dto.responsavelId,
@@ -53,6 +60,7 @@ export class AlunoService {
       email: dto.email,
       observacoes: dto.observacoes,
     });
+    return toAlunoResponse(aluno);
   }
 
   async remove(organizacaoId: string, id: string) {
