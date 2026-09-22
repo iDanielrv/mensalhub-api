@@ -22,6 +22,14 @@ export class PrismaService
       adapter: new PrismaPg({
         connectionString: config.getOrThrow<string>('DATABASE_URL'),
       }),
+      // Segurança estrutural: o hash de senha NUNCA sai do banco por padrão.
+      // Nenhuma query o retorna, a menos que peça explicitamente com
+      // `omit: { senhaHash: false }` (só o login precisa, p/ conferir a senha).
+      // Garante que futuros endpoints (ex.: tela de admin de usuários) não
+      // vazem o hash mesmo que esqueçam de mapear a resposta.
+      omit: {
+        usuario: { senhaHash: true },
+      },
     });
   }
 

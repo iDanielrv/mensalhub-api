@@ -16,9 +16,14 @@ export class UsuarioRepository {
     private readonly tenant: TenantContext,
   ) {}
 
+  // Único ponto que precisa do senhaHash (para o bcrypt.compare do login), então
+  // pede explicitamente o campo que o omit global esconde por padrão.
   findByEmail(email: string): Promise<Usuario | null> {
     return this.tenant.runCrossTenant(() =>
-      this.prisma.usuario.findUnique({ where: { email } }),
+      this.prisma.usuario.findUnique({
+        where: { email },
+        omit: { senhaHash: false },
+      }),
     );
   }
 
