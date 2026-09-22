@@ -1,11 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { MetodoPagamento, Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  TENANT_PRISMA,
+  type TenantPrismaClient,
+} from '../../common/tenant/tenant.extension.js';
 
-// Camada de dados da Matrícula. Regra: TODO acesso é escopado por organizacaoId.
+// Camada de dados da Matrícula. O isolamento por organizacaoId é garantido pela
+// extensão de tenant (TENANT_PRISMA); os filtros explícitos abaixo são redundância.
 @Injectable()
 export class MatriculaRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
+  ) {}
 
   create(data: Prisma.MatriculaUncheckedCreateInput) {
     return this.prisma.matricula.create({

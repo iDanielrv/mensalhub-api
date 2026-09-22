@@ -1,11 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  TENANT_PRISMA,
+  type TenantPrismaClient,
+} from '../../common/tenant/tenant.extension.js';
 
-// Camada de dados do Curso. Regra: TODO acesso é escopado por organizacaoId.
+// Camada de dados do Curso. O isolamento por organizacaoId é garantido pela
+// extensão de tenant (TENANT_PRISMA); os filtros explícitos abaixo são redundância.
 @Injectable()
 export class CursoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
+  ) {}
 
   create(data: Prisma.CursoUncheckedCreateInput) {
     return this.prisma.curso.create({ data });

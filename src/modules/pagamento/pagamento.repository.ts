@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { MetodoPagamento, MensalidadeStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  TENANT_PRISMA,
+  type TenantPrismaClient,
+} from '../../common/tenant/tenant.extension.js';
 
 @Injectable()
 export class PagamentoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
+  ) {}
 
   findMensalidade(organizacaoId: string, mensalidadeId: string) {
     return this.prisma.mensalidade.findFirst({

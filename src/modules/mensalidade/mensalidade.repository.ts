@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { MensalidadeStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  TENANT_PRISMA,
+  type TenantPrismaClient,
+} from '../../common/tenant/tenant.extension.js';
 
 @Injectable()
 export class MensalidadeRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
+  ) {}
 
   // Gera mensalidades para todas as matrículas ATIVA do mês. Ignora duplicatas
   // (unique [matriculaId, competencia]) para poder chamar novamente sem problemas.

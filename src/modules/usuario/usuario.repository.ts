@@ -1,16 +1,30 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Usuario } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { TenantContext } from '../../common/tenant/tenant-context.service.js';
+import {
+  TENANT_PRISMA,
+  type TenantPrismaClient,
+} from '../../common/tenant/tenant.extension.js';
 
+// Lookups de login/refresh são cross-tenant por natureza: ainda não se sabe a
+// organização, então rodam via runCrossTenant, sem o filtro automático da
+// extensão de tenant.
 @Injectable()
 export class UsuarioRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
+    private readonly tenant: TenantContext,
+  ) {}
 
   findByEmail(email: string): Promise<Usuario | null> {
-    return this.prisma.usuario.findUnique({ where: { email } });
+    return this.tenant.runCrossTenant(() =>
+      this.prisma.usuario.findUnique({ where: { email } }),
+    );
   }
 
   findById(id: string): Promise<Usuario | null> {
-    return this.prisma.usuario.findUnique({ where: { id } });
+    return this.tenant.runCrossTenant(() =>
+      this.prisma.usuario.findUnique({ where: { id } }),
+    );
   }
 }

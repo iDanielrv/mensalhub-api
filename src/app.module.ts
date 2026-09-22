@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
+import { TenantContextInterceptor } from './common/tenant/tenant-context.interceptor.js';
 import { validateEnv } from './config/env.validation.js';
 import { AlunoModule } from './modules/aluno/aluno.module.js';
 import { CursoModule } from './modules/curso/curso.module.js';
@@ -48,6 +49,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AppService,
     // Guard global: toda rota exige JWT, exceto as marcadas com @Public().
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Interceptor global: abre o contexto de tenant (organizacaoId do JWT) para
+    // que a extensão do Prisma isole os dados por organização automaticamente.
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
 })
 export class AppModule {}

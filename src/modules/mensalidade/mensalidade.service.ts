@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { TenantContext } from '../../common/tenant/tenant-context.service.js';
 import { MensalidadeRepository } from './mensalidade.repository.js';
 import type { GerarMensalidadesDto } from './dto/gerar-mensalidades.dto.js';
 import type { UpdateMensalidadeDto } from './dto/update-mensalidade.dto.js';
@@ -8,7 +9,10 @@ import type { UpdateMensalidadeDto } from './dto/update-mensalidade.dto.js';
 export class MensalidadeService {
   private readonly logger = new Logger(MensalidadeService.name);
 
-  constructor(private readonly mensalidades: MensalidadeRepository) {}
+  constructor(
+    private readonly mensalidades: MensalidadeRepository,
+    private readonly tenant: TenantContext,
+  ) {}
 
   gerar(organizacaoId: string, dto: GerarMensalidadesDto) {
     return this.mensalidades.gerar(organizacaoId, dto.mes, dto.ano);
@@ -26,7 +30,10 @@ export class MensalidadeService {
 
     this.logger.log(`Geração automática ${mes}/${ano}: iniciando…`);
     try {
-      const { geradas, total } = await this.mensalidades.gerarTodas(mes, ano);
+      // Job de sistema: roda para TODAS as organizações, então é cross-tenant.
+      const { geradas, total } = await this.tenant.runCrossTenant(() =>
+        this.mensalidades.gerarTodas(mes, ano),
+      );
       this.logger.log(
         `Geração automática ${mes}/${ano}: ${geradas} mensalidade(s) criada(s) de ${total} matrícula(s) ativa(s).`,
       );
