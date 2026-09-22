@@ -1,9 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MensalidadeStatus, Prisma } from '@prisma/client';
 import {
+  competenciaDe,
+  vencimentoDe,
+} from '../../common/date/competencia.util.js';
+import {
   TENANT_PRISMA,
   type TenantPrismaClient,
 } from '../../common/tenant/tenant.extension.js';
+
+// Matrícula com os campos necessários para gerar uma mensalidade.
+type MatriculaParaCobranca = {
+  id: string;
+  organizacaoId: string;
+  diaVencimento: number;
+  valor: Prisma.Decimal | null;
+};
 
 @Injectable()
 export class MensalidadeRepository {
@@ -11,47 +23,35 @@ export class MensalidadeRepository {
     @Inject(TENANT_PRISMA) private readonly prisma: TenantPrismaClient,
   ) {}
 
-  // Gera mensalidades para todas as matrículas ATIVA do mês. Ignora duplicatas
-  // (unique [matriculaId, competencia]) para poder chamar novamente sem problemas.
+  // Gera mensalidades para todas as matrículas ATIVA do mês (escopo da org atual).
   async gerar(organizacaoId: string, mes: number, ano: number) {
     const matriculas = await this.prisma.matricula.findMany({
       where: { organizacaoId, status: 'ATIVA' },
-      select: { id: true, diaVencimento: true, valor: true },
+      select: { id: true, organizacaoId: true, diaVencimento: true, valor: true },
     });
-
-    const competencia = new Date(Date.UTC(ano, mes - 1, 1));
-    const ultimoDia = new Date(ano, mes, 0).getDate(); // Date(ano, mes, 0) = último dia do mês
-
-    const dados = matriculas
-      .filter((m) => m.valor !== null)
-      .map((m) => ({
-        organizacaoId,
-        matriculaId: m.id,
-        competencia,
-        vencimento: new Date(Date.UTC(ano, mes - 1, Math.min(m.diaVencimento, ultimoDia))),
-        valor: m.valor as Prisma.Decimal,
-      }));
-
-    const resultado = await this.prisma.mensalidade.createMany({
-      data: dados,
-      skipDuplicates: true,
-    });
-
-    return { geradas: resultado.count, total: matriculas.length };
+    return this.criarMensalidades(matriculas, mes, ano);
   }
 
   // Geração de sistema (cron): gera para as matrículas ATIVA de TODAS as
   // organizações de uma vez. Não é scoped por JWT — é um job, não uma requisição.
-  // Reaproveita o unique [matriculaId, competencia] via skipDuplicates, então é
-  // seguro rodar mais de uma vez no mesmo mês.
   async gerarTodas(mes: number, ano: number) {
     const matriculas = await this.prisma.matricula.findMany({
       where: { status: 'ATIVA' },
       select: { id: true, organizacaoId: true, diaVencimento: true, valor: true },
     });
+    return this.criarMensalidades(matriculas, mes, ano);
+  }
 
-    const competencia = new Date(Date.UTC(ano, mes - 1, 1));
-    const ultimoDia = new Date(ano, mes, 0).getDate();
+  // Núcleo compartilhado por gerar/gerarTodas: monta as linhas (competência e
+  // vencimento do mês, pulando matrículas sem valor) e insere ignorando
+  // duplicatas (unique [matriculaId, competencia]) — logo é idempotente e pode
+  // rodar de novo no mesmo mês sem duplicar.
+  private async criarMensalidades(
+    matriculas: MatriculaParaCobranca[],
+    mes: number,
+    ano: number,
+  ) {
+    const competencia = competenciaDe(ano, mes);
 
     const dados = matriculas
       .filter((m) => m.valor !== null)
@@ -59,7 +59,7 @@ export class MensalidadeRepository {
         organizacaoId: m.organizacaoId,
         matriculaId: m.id,
         competencia,
-        vencimento: new Date(Date.UTC(ano, mes - 1, Math.min(m.diaVencimento, ultimoDia))),
+        vencimento: vencimentoDe(ano, mes, m.diaVencimento),
         valor: m.valor as Prisma.Decimal,
       }));
 
@@ -86,7 +86,7 @@ export class MensalidadeRepository {
   findMany(organizacaoId: string, mes?: number, ano?: number) {
     const where: Prisma.MensalidadeWhereInput = { organizacaoId };
     if (mes && ano) {
-      where.competencia = new Date(Date.UTC(ano, mes - 1, 1));
+      where.competencia = competenciaDe(ano, mes);
     }
     return this.prisma.mensalidade.findMany({
       where,

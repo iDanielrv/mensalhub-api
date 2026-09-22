@@ -3,6 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  competenciaDe,
+  vencimentoDe,
+} from '../../common/date/competencia.util.js';
 import { MatriculaRepository } from './matricula.repository.js';
 import type { CreateMatriculaDto } from './dto/create-matricula.dto.js';
 import type { UpdateMatriculaDto } from './dto/update-matricula.dto.js';
@@ -66,18 +70,13 @@ export class MatriculaService {
     // Competência e vencimento derivam do mês de início da matrícula.
     const inicio = new Date(matricula.inicio);
     const ano = inicio.getUTCFullYear();
-    const mes = inicio.getUTCMonth(); // 0-based
-    const competencia = new Date(Date.UTC(ano, mes, 1));
-    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
-    const vencimento = new Date(
-      Date.UTC(ano, mes, Math.min(matricula.diaVencimento, ultimoDia)),
-    );
+    const mes = inicio.getUTCMonth() + 1; // 1-based
 
     return this.matriculas.ativarComPrimeiroPagamento({
       organizacaoId,
       matriculaId: id,
-      competencia,
-      vencimento,
+      competencia: competenciaDe(ano, mes),
+      vencimento: vencimentoDe(ano, mes, matricula.diaVencimento),
       valor,
       metodo: dto.metodo,
       data: dto.data ? new Date(dto.data) : new Date(),
