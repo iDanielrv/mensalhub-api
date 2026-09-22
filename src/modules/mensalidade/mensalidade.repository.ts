@@ -264,10 +264,25 @@ export class MensalidadeRepository {
   findOne(organizacaoId: string, id: string) {
     return this.prisma.mensalidade.findFirst({
       where: { id, organizacaoId },
+      include: MensalidadeRepository.comNomes,
     });
   }
 
   update(id: string, data: Prisma.MensalidadeUncheckedUpdateInput) {
-    return this.prisma.mensalidade.update({ where: { id }, data });
+    return this.prisma.mensalidade.update({
+      where: { id },
+      data,
+      include: MensalidadeRepository.comNomes,
+    });
   }
+
+  // Include padrão para trazer o nome do aluno e do curso junto da mensalidade.
+  private static readonly comNomes = {
+    matricula: {
+      select: {
+        aluno: { select: { nome: true } },
+        curso: { select: { nome: true } },
+      },
+    },
+  } satisfies Prisma.MensalidadeInclude;
 }

@@ -16,7 +16,17 @@ describe('PagamentoService.create', () => {
   beforeEach(() => {
     repo = {
       findMensalidade: vi.fn(),
-      criarComBaixa: vi.fn().mockResolvedValue({ ok: true }),
+      // criarComBaixa roda numa transação e devolve [pagamento, mensalidade].
+      criarComBaixa: vi.fn().mockResolvedValue([
+        {
+          id: 'p-1',
+          mensalidadeId: 'men-1',
+          valor: 150,
+          metodo: 'PIX',
+          data: new Date('2026-09-15'),
+        },
+        {},
+      ]),
     };
     service = new PagamentoService(repo as unknown as PagamentoRepository);
   });

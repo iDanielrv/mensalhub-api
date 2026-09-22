@@ -2,6 +2,10 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TenantContext } from '../../common/tenant/tenant-context.service.js';
 import { MensalidadeRepository } from './mensalidade.repository.js';
+import {
+  toMensalidadeResponse,
+  type MensalidadeResponse,
+} from './mensalidade.response.js';
 import type { GerarMensalidadesDto } from './dto/gerar-mensalidades.dto.js';
 import type { UpdateMensalidadeDto } from './dto/update-mensalidade.dto.js';
 
@@ -48,16 +52,21 @@ export class MensalidadeService {
     }
   }
 
-  async findAll(organizacaoId: string, mes?: number, ano?: number) {
+  async findAll(
+    organizacaoId: string,
+    mes?: number,
+    ano?: number,
+  ): Promise<MensalidadeResponse[]> {
     // Atualiza status antes de retornar para refletir atrasos sem precisar de cron.
     await this.mensalidades.marcarAtrasadas(organizacaoId);
-    return this.mensalidades.findMany(organizacaoId, mes, ano);
+    const mensalidades = await this.mensalidades.findMany(organizacaoId, mes, ano);
+    return mensalidades.map(toMensalidadeResponse);
   }
 
-  async findOne(organizacaoId: string, id: string) {
+  async findOne(organizacaoId: string, id: string): Promise<MensalidadeResponse> {
     const mensalidade = await this.mensalidades.findOne(organizacaoId, id);
     if (!mensalidade) throw new NotFoundException('Mensalidade não encontrada');
-    return mensalidade;
+    return toMensalidadeResponse(mensalidade);
   }
 
   resumoFinanceiro(organizacaoId: string) {
@@ -133,8 +142,13 @@ export class MensalidadeService {
     return { totalGeral, totalAlunos: inadimplentes.length, percentualInadimplentes: percentual, inadimplentes };
   }
 
-  async update(organizacaoId: string, id: string, dto: UpdateMensalidadeDto) {
+  async update(
+    organizacaoId: string,
+    id: string,
+    dto: UpdateMensalidadeDto,
+  ): Promise<MensalidadeResponse> {
     await this.findOne(organizacaoId, id);
-    return this.mensalidades.update(id, { status: dto.status });
+    const mensalidade = await this.mensalidades.update(id, { status: dto.status });
+    return toMensalidadeResponse(mensalidade);
   }
 }

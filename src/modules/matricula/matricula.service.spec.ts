@@ -6,14 +6,20 @@ import type { MatriculaRepository } from './matricula.repository.js';
 const ORG = 'org-1';
 
 // Matrícula base para os testes de ativação (mês de início setembro/2026).
+// Espelha o retorno do repositório, que sempre inclui os nomes de aluno e curso.
 function matriculaBase(overrides: Record<string, unknown> = {}) {
   return {
     id: 'mat-1',
     organizacaoId: ORG,
+    alunoId: 'a-1',
+    cursoId: 'c-1',
     status: 'AGUARDANDO',
     inicio: new Date(Date.UTC(2026, 8, 1)), // setembro (0-based 8)
+    fim: null,
     diaVencimento: 10,
     valor: 150,
+    aluno: { nome: 'João' },
+    curso: { nome: 'Violão' },
     ...overrides,
   };
 }
@@ -28,7 +34,10 @@ describe('MatriculaService.ativarComPagamento', () => {
   beforeEach(() => {
     repo = {
       findOne: vi.fn(),
-      ativarComPrimeiroPagamento: vi.fn().mockResolvedValue({ ok: true }),
+      // Retorna uma matrícula mapeável (com aluno/curso), como o repo real faz.
+      ativarComPrimeiroPagamento: vi
+        .fn()
+        .mockResolvedValue(matriculaBase({ status: 'ATIVA' })),
     };
     service = new MatriculaService(repo as unknown as MatriculaRepository);
   });

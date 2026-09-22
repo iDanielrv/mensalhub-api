@@ -4,6 +4,16 @@ import { TenantContext } from '../../common/tenant/tenant-context.service.js';
 import { MensalidadeService } from './mensalidade.service.js';
 import type { MensalidadeRepository } from './mensalidade.repository.js';
 
+// Mensalidade como o repositório retorna (com nomes de aluno/curso via matrícula).
+const mensalidadeMock = {
+  id: 'men-1',
+  competencia: new Date('2026-09-01'),
+  vencimento: new Date('2026-09-10'),
+  valor: 150,
+  status: 'ABERTA',
+  matricula: { aluno: { nome: 'João' }, curso: { nome: 'Violão' } },
+};
+
 describe('MensalidadeService', () => {
   let repo: Record<string, ReturnType<typeof vi.fn>>;
   let tenant: TenantContext;
@@ -14,7 +24,7 @@ describe('MensalidadeService', () => {
       gerar: vi.fn().mockResolvedValue({ geradas: 1, total: 1 }),
       gerarTodas: vi.fn().mockResolvedValue({ geradas: 2, total: 3 }),
       findOne: vi.fn(),
-      update: vi.fn().mockResolvedValue({ ok: true }),
+      update: vi.fn().mockResolvedValue(mensalidadeMock),
     };
     tenant = new TenantContext();
     service = new MensalidadeService(
@@ -47,7 +57,7 @@ describe('MensalidadeService', () => {
     });
 
     it('atualiza o status quando a mensalidade existe', async () => {
-      repo.findOne.mockResolvedValue({ id: 'men-1' });
+      repo.findOne.mockResolvedValue(mensalidadeMock);
       await service.update('org-1', 'men-1', { status: 'CANCELADA' } as never);
       expect(repo.update).toHaveBeenCalledWith('men-1', { status: 'CANCELADA' });
     });

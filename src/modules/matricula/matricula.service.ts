@@ -8,6 +8,10 @@ import {
   vencimentoDe,
 } from '../../common/date/competencia.util.js';
 import { MatriculaRepository } from './matricula.repository.js';
+import {
+  toMatriculaResponse,
+  type MatriculaResponse,
+} from './matricula.response.js';
 import type { CreateMatriculaDto } from './dto/create-matricula.dto.js';
 import type { UpdateMatriculaDto } from './dto/update-matricula.dto.js';
 import type { AtivarMatriculaDto } from './dto/ativar-matricula.dto.js';
@@ -16,14 +20,17 @@ import type { AtivarMatriculaDto } from './dto/ativar-matricula.dto.js';
 export class MatriculaService {
   constructor(private readonly matriculas: MatriculaRepository) {}
 
-  async create(organizacaoId: string, dto: CreateMatriculaDto) {
+  async create(
+    organizacaoId: string,
+    dto: CreateMatriculaDto,
+  ): Promise<MatriculaResponse> {
     const aluno = await this.matriculas.alunoExisteNaOrg(organizacaoId, dto.alunoId);
     if (!aluno) throw new BadRequestException('Aluno não encontrado nesta organização');
 
     const curso = await this.matriculas.cursoExisteNaOrg(organizacaoId, dto.cursoId);
     if (!curso) throw new BadRequestException('Curso não encontrado nesta organização');
 
-    return this.matriculas.create({
+    const matricula = await this.matriculas.create({
       organizacaoId,
       alunoId: dto.alunoId,
       cursoId: dto.cursoId,
@@ -33,16 +40,18 @@ export class MatriculaService {
       // Usa o valor do curso como padrão; permite override por matrícula.
       valor: dto.valor ?? curso.valorMensalidade,
     });
+    return toMatriculaResponse(matricula);
   }
 
-  findAll(organizacaoId: string) {
-    return this.matriculas.findMany(organizacaoId);
+  async findAll(organizacaoId: string): Promise<MatriculaResponse[]> {
+    const matriculas = await this.matriculas.findMany(organizacaoId);
+    return matriculas.map(toMatriculaResponse);
   }
 
-  async findOne(organizacaoId: string, id: string) {
+  async findOne(organizacaoId: string, id: string): Promise<MatriculaResponse> {
     const matricula = await this.matriculas.findOne(organizacaoId, id);
     if (!matricula) throw new NotFoundException('Matrícula não encontrada');
-    return matricula;
+    return toMatriculaResponse(matricula);
   }
 
   // Ativa uma matrícula AGUARDANDO cobrando o 1º pagamento (mensalidade do mês
@@ -72,7 +81,7 @@ export class MatriculaService {
     const ano = inicio.getUTCFullYear();
     const mes = inicio.getUTCMonth() + 1; // 1-based
 
-    return this.matriculas.ativarComPrimeiroPagamento({
+    const ativada = await this.matriculas.ativarComPrimeiroPagamento({
       organizacaoId,
       matriculaId: id,
       competencia: competenciaDe(ano, mes),
@@ -81,15 +90,21 @@ export class MatriculaService {
       metodo: dto.metodo,
       data: dto.data ? new Date(dto.data) : new Date(),
     });
+    return toMatriculaResponse(ativada);
   }
 
-  async update(organizacaoId: string, id: string, dto: UpdateMatriculaDto) {
+  async update(
+    organizacaoId: string,
+    id: string,
+    dto: UpdateMatriculaDto,
+  ): Promise<MatriculaResponse> {
     await this.findOne(organizacaoId, id);
-    return this.matriculas.update(id, {
+    const matricula = await this.matriculas.update(id, {
       fim: dto.fim ? new Date(dto.fim) : undefined,
       diaVencimento: dto.diaVencimento,
       valor: dto.valor,
       status: dto.status,
     });
+    return toMatriculaResponse(matricula);
   }
 }
